@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block title %}Login{% endblock %}
+
+{% block content %}
+    <h1>
+        {{ profile_user.username }}'s Notes
+        {% if not is_owner %}
+            <form method="POST" action="{% url 'user_follow' profile_user.id %}">
+                {% csrf_token %}
+                {% if is_following %}
+                    <button type="submit" class="btn btn-danger">Unobserve</button>
+                {% else %}
+                    <button type="submit" class="btn btn-primary">Observe</button>
+                {% endif %}
+            </form>
+        {% endif %}
+    </h1>
+
+    <h2>All Notes</h2>
+    <ul>
+        {% for note in notes %}
+            <li>
+                <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
+                <div>
+                    {{ note.serialized_content|safe }}
+                </div>
+                <form action="{% url 'like_note' note.id %}" method="post">
+                    {% csrf_token %}
+                    <button type="submit", name="note_id", class="like-button", value="{{ note.id }}">{{ note.likes.count }} {{ note.likes.count|pluralize:"Like,Likes" }}</button>
+                </form>
+            </li>
+        {% empty %}
+            <li>No notes yet.</li>
+        {% endfor %}
+    </ul>
+
+    {% if is_owner %}
+        <h2>Add a New Note</h2>
+        <form method="post">
+            {% csrf_token %}
+            {{ form.as_p }}
+            <button type="submit">Save Note</button>
+        </form>
+    {% endif %}
+{% endblock %}

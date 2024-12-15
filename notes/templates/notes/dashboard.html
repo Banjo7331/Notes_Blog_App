@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+    <h3>Most popular Notes</h3>
+    {% for note in notes %}
+        <li>
+            <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
+            <div>
+                {{ note.serialized_content|safe }}
+            </div>
+            <form action="{% url 'like_note' note.id %}" method="post">
+                {% csrf_token %}
+                <button type="submit", name="note_id", class="like-button", value="{{ note.id }}">{{ note.likes.count }} {{ note.likes.count|pluralize:"Like,Likes" }}</button>
+            </form>
+        </li>
+    {% endfor %}
+{% endblock %}

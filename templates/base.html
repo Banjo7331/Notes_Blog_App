@@ -8,14 +8,14 @@
 <body>
     <div id="header">
         <span class="logo">NotesBestApp</span>
-        {% if request.user.is_authenricated %}
+        {% if request.user.is_authenticated %}
             <ul class="menu">
                 <li {% if seciton == "dashboard" %}class="selected"{% endif %}>
                     <a href="{% url "dashboard" %}">Dashboard</a>
                 </li>
-                <li {% if section == "notes" %}class="selected"{% endif %}>
+                {% comment %} <li {% if section == "notes" %}class="selected"{% endif %}>
                     <a href="{% url "notes" %}">Notes</a>
-                </li>
+                </li> {% endcomment %}
                 <li {% if section == "people" %}class="selected"{% endif %}>
                     <a href="#">People</a>
                 </li>
@@ -23,7 +23,7 @@
         {% endif %}
         <span class="user">
             {% if request.user.is_authenticated %}
-                Welcome, {{ request.user.first_name }}!
+                Welcome, {{ request.user.username }}
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
                     <button type="submit" style="all: unset; cursor: pointer;">logout</button>

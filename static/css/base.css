@@ -275,3 +275,30 @@ img.user-detail {
     font-style:italic;
     color:#ccc;
 }
+
+.like-button {
+    background-color: #007bff; 
+    color: white; 
+    border: none; 
+    border-radius: 5px; 
+    padding: 10px 15px; 
+    font-size: 16px; 
+    cursor: pointer; 
+    transition: background-color 0.3s ease, transform 0.2s ease; 
+}
+
+.like-button:hover {
+    background-color: #0056b3; 
+    transform: scale(1.05); 
+}
+
+.like-button:focus {
+    outline: 2px solid #0056b3; 
+    outline-offset: 2px;
+}
+
+.like-button:disabled {
+    background-color: #ccc; 
+    color: #666; 
+    cursor: not-allowed; 
+}
