@@ -2,12 +2,14 @@ from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
+
+from account.models import Follow
 from .models import Note
 from .forms import MarkdownNoteForm
 from .utils import sanitize_markdown
 from django.db.models import Count
 
-NoteUser = get_user_model()
+NoteSiteUser = get_user_model()
 
 def LikeView(request, note_id):
     note = get_object_or_404(Note, id=note_id)
@@ -18,16 +20,18 @@ def LikeView(request, note_id):
     return redirect('profile', username=note.user.username)
 
 def FallowView(request, user_id):
-    user = get_object_or_404(NoteUser, id=user_id)
+    user = get_object_or_404(NoteSiteUser, id=user_id)
     if user == request.user:
         messages.error(request, "You cannot follow yourself!")
         return redirect('profile', username=user.username)
 
-    if request.user.follows.filter(id=user.id).exists():
-        request.user.follows.remove(user)
+    follow_relationship = Follow.objects.filter(follower=request.user, following=user)
+
+    if follow_relationship.exists():
+        follow_relationship.delete()
         messages.success(request, f"You have unfollowed {user.username}.")
     else:
-        request.user.follows.add(user)
+        Follow.objects.create(follower=request.user, following=user)
         messages.success(request, f"You are now following {user.username}.")
 
     return redirect('profile', username=user.username)
@@ -35,10 +39,10 @@ def FallowView(request, user_id):
 @login_required
 def profile_view(request, username):
 
-    profile_user = get_object_or_404(NoteUser, username=username)
+    profile_user = get_object_or_404(NoteSiteUser, username=username)
 
-    is_following = profile_user in request.user.follows.all()
-
+    is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists() if request.user.is_authenticated else False
+    print(is_following)
     user_notes = Note.objects.filter(user=profile_user).order_by('-created_at')
 
     is_owner = request.user.is_authenticated and profile_user == request.user
@@ -75,8 +79,10 @@ def dashboard(request):
     user = request.user
     notes = Note.objects.annotate(like_count=Count('likes')).order_by('-like_count', '-created_at')
     
-    if user.follows.exists():
-        notes = Note.objects.filter(user__in=user.follows.all()).annotate(
+    if Follow.objects.filter(follower=user).exists():
+        notes = Note.objects.filter(
+            user__in=Follow.objects.filter(follower=user).values_list('following', flat=True)
+        ).annotate(
             like_count=Count('likes')
         ).order_by('-created_at')
 

@@ -1,26 +1,18 @@
 from django.db import models
 from django.contrib.auth.models import AbstractUser
-import pyotp
 
 
 class NoteSiteUser(AbstractUser):
-    otp_secret = models.CharField(max_length=32, default=pyotp.random_base32, blank=True, null=True)
-    is_2fa_enabled = models.BooleanField(default=True) 
-    follows = models.ManyToManyField(
-        "self", related_name="followed_by", symmetrical=False, blank=True
-    )
+    otp_secret = models.CharField(max_length=32, blank=True, null=True)
+    is_2fa_enabled = models.BooleanField(default=False) 
 
-    def follow(self, user):
-        if user != self:
-            self.follows.add(user)
+    def __getitem__(self, key):
+        if hasattr(self, key):
+            return getattr(self, key)
+        raise KeyError(f"Key '{key}' does not exist in NoteSiteUser.")
 
-    def unfollow(self, user):
-        if user != self:
-            self.follows.remove(user)
-
-    def is_following(self, user):
-        return self.follows.filter(id=user.id).exists()
-
-    def is_followed_by(self, user):
-        return self.followed_by.filter(id=user.id).exists()
+class Follow(models.Model):
+    follower = models.ForeignKey(NoteSiteUser, related_name='following', on_delete=models.CASCADE)
+    following = models.ForeignKey(NoteSiteUser, related_name='followers', on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
 

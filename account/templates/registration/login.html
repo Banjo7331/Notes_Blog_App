@@ -4,11 +4,11 @@
 
 {% block content %}
     {% if messages %}
-    <ul class="messages">
-        {% for message in messages %}
-            <li class="{{ message.tags }}">{{ message }}</li>
-        {% endfor %}
-    </ul>
+        <ul class="messages">
+            {% for message in messages %}
+                <li class="{{ message.tags }}">{{ message }}</li>
+            {% endfor %}
+        </ul>
     {% endif %}
     <h2>Login</h2>
     {% if form.errors %}
@@ -22,5 +22,6 @@
             {% csrf_token %}
             <p><input type="submit" value="Login"></p>
         </form>
+        <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
     </div>
 {% endblock %}

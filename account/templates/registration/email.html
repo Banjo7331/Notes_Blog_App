@@ -1,0 +1,4 @@
+We got a request to reset your password for user with e-mail: {{ email }}. 
+If you didn't make the request, just ignore this email. Otherwise, you can reset your password using the link below.
+{{protocol}}://{{ domain}}{% url "password_reset_confirm" uidb64=uid token=token %}
+Your username: {{ user.get_username }}
