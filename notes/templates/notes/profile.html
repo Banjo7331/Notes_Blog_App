@@ -16,31 +16,52 @@
             </form>
         {% endif %}
     </h1>
+    <div class="row">
+        <div class="column content">
+            <h2>All Notes</h2>
+                {% for note in page_obj %}
+                    <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
+                    <div>
+                        {{ note.serialized_content|safe }}
+                    </div>
+                    <form action="{% url 'like_note' note.id %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit", name="note_id", class="like-button", value="{{ note.id }}">{{ note.likes.count }} {{ note.likes.count|pluralize:"Like,Likes" }}</button>
+                    </form>
+                {% empty %}
+                    No notes yet.
+                {% endfor %}
 
-    <h2>All Notes</h2>
-    <ul>
-        {% for note in notes %}
-            <li>
-                <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
-                <div>
-                    {{ note.serialized_content|safe }}
-                </div>
-                <form action="{% url 'like_note' note.id %}" method="post">
+                {% if page_obj.has_next and forloop.last %}
+                    <span hx-get="{% url 'dashboard' %}?page={{ page_obj.next_page_number }}"
+                        hx-swap="beforeend" hx-target="#notes" hx-select=".note"
+                        hx-trigger="revealed">
+                    </span>
+                {% endif %}
+        </div>
+
+        {% if is_owner and is_obligated %}
+            <div class="column note_form">
+                <h2>Add a New Note</h2>
+                <form method="post">
                     {% csrf_token %}
-                    <button type="submit", name="note_id", class="like-button", value="{{ note.id }}">{{ note.likes.count }} {{ note.likes.count|pluralize:"Like,Likes" }}</button>
+                    {{ form.as_p }}
+                    <button type="submit">Save Note</button>
                 </form>
-            </li>
-        {% empty %}
-            <li>No notes yet.</li>
-        {% endfor %}
-    </ul>
+            </div>
+        {% endif %}
+        {% if is_owner and not is_obligated %}
+            <div class="column note_form">
+                <h2>Upload Your Public Key If You Want To Send Notes</h2>
+                <form method="post">
+                    {% csrf_token %}
+                    {{ form.as_p }}
+                    <button type="submit">Save Public Key</button>
+                </form>
+            </div>
+        {% endif %}
+    </div>
 
-    {% if is_owner %}
-        <h2>Add a New Note</h2>
-        <form method="post">
-            {% csrf_token %}
-            {{ form.as_p }}
-            <button type="submit">Save Note</button>
-        </form>
-    {% endif %}
+    <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
+
 {% endblock %}

@@ -44,6 +44,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'axes.middleware.AxesMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -51,7 +52,7 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
-    'axes.middleware.AxesMiddleware',
+    
 ]
 
 ROOT_URLCONF = 'notes_keeping_site.urls'
@@ -89,12 +90,23 @@ DATABASES = {
 # Password validation
 # https://docs.djangoproject.com/en/5.1/ref/settings/#auth-password-validators
 
+PASSWORD_HASHERS = [
+    "django.contrib.auth.hashers.Argon2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2PasswordHasher",
+    "django.contrib.auth.hashers.PBKDF2SHA1PasswordHasher",
+    "django.contrib.auth.hashers.BCryptSHA256PasswordHasher",
+    "django.contrib.auth.hashers.ScryptPasswordHasher",
+]
+
+ARGON2_PARAMETERS = {
+    'time_cost': 3,
+    'memory_cost': 128000,
+    'parallelism': 2,
+}
+
 AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
     },
     {
         'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
@@ -102,14 +114,21 @@ AUTH_PASSWORD_VALIDATORS = [
     {
         'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
     },
+    {
+        'NAME': 'account.validators.PolicyValidator',
+        'OPTIONS': {
+            'min_length': 10,
+            'uppercase': 1,
+            'numbers': 1,
+            'special': 1,
+            'nonletters': 1,
+        },
+    },
 ]
 
 AUTH_USER_MODEL = 'account.NoteSiteUser'
 
-AXES_USERNAME_FAILURE_LIMIT = 5
-AXES_IP_FAILURE_LIMIT = 5
-AXES_USE_USERNAMES = True
-AXES_USE_IPS = True
+AXES_FAILURE_LIMIT = 5
 AXES_COOLOFF_TIME = 1
 AXES_RESET_ON_SUCCESS = True
 
@@ -133,11 +152,13 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/5.1/howto/static-files/
 
-STATIC_URL = 'static/'
+STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    BASE_DIR / "static",
+    os.path.join(BASE_DIR, "static"),
 ]
+
+STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 # Default primary key field type
 # https://docs.djangoproject.com/en/5.1/ref/settings/#default-auto-field
 
@@ -152,3 +173,6 @@ EMAIL_HOST_USER = 'surveycomptest@gmail.com'
 EMAIL_HOST_PASSWORD = 'gbfg dkop obwm xgaz'
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
+
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True

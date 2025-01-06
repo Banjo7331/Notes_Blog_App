@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+
+{% block title %}Registration email verification{% endblock %}
+
+{% block content %}
+    <h1>You're almost done!</h1>
+    <p>We sent an email to {{ new_user.email }} with a verification link. Click the link to complete your registration.</p>
+{% endblock %}

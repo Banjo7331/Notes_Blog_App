@@ -4,55 +4,93 @@ from django.contrib.auth import authenticate, login, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from account.models import NoteSiteUser
-from account.utils import send_otp
+from account.utils import evaluate_password_strength
 from .forms import LoginForm, UserRegistrationForm
 from django.contrib.auth.views import LoginView
 from axes.handlers.proxy import AxesProxyHandler
 from django.contrib import messages
 import pyotp
 import io
-import qrcode
 from datetime import datetime
 import base64
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
+from django.utils.http import urlsafe_base64_decode
+from account.utils import email_verification, generate_qr_code, encrypt_otp_secret, decrypt_otp_secret
+from django.utils.encoding import force_str
+from account.tokens import account_activation_token
 
+def user_login(request):
+    storage = messages.get_messages(request)
+    storage.used = True
+    
+    if AxesProxyHandler.is_locked(request):
+        messages.error(request, 'Account locked: too many login attempts. Please try again later.')
 
-class OTPLoginView(LoginView):
-    def form_valid(self, form):
-        print("siema"+AxesProxyHandler.is_locked(self.request))
-        if AxesProxyHandler.is_locked(self.request):
-            messages.error(self.request, 'Account locked: too many login attempts. Please try again later.')
-            return redirect('login') 
-        
-        username = form.cleaned_data.get('username')
-        password = form.cleaned_data.get('password')
-        user = authenticate(self.request, username=username, password=password)
+    if request.method == 'POST':
+        form = LoginForm(request.POST)
+        if form.is_valid():
+            cd = form.cleaned_data
 
-        if user is not None:
-            self.request.session['temp_user_id'] = user.id
-            print(f"2FA Enabled: {getattr(user, 'is_2fa_enabled', True)}")
-            if user.is_2fa_enabled: 
-                self.request.session['temp_user_id'] = user.id
-                return redirect('verify_otp')
-            login(self.request, user)
-            return redirect('dashboard')
-        else:
-            messages.error(self.request, 'Invalid username or password.')
-            return redirect('login')
+            user = authenticate(request, username=cd['username'], password=cd['password'])
+            if user is not None:
+                if user.is_active:
+                    request.session['temp_user_id'] = user.id
+
+                    return redirect('verify_otp') 
+                else:
+                    return HttpResponse('Disabled account')
+            else:
+                messages.error(request, 'Invalid username or password.')
+                return redirect('login')  
+    else:
+        form = LoginForm()
+
+    return render(request, 'registration/login.html', {'form': form})  
 
 def register(request):
     if request.method == 'POST':
         user_form = UserRegistrationForm(request.POST)
         if user_form.is_valid():
+            password = user_form.cleaned_data['password']
+
+            password_strength, password_message = evaluate_password_strength(password)
+
+            try:
+                validate_password(password)
+            except ValidationError as e:
+                user_form.add_error('password', e)
+                return render(request, 'registration/register.html', {
+                    'user_form': user_form,
+                    'password_strength': password_strength,
+                    'password_message': password_message,
+                })
+            
+            if password_strength == "very_weak":
+                user_form.add_error('password', "Password is too weak.")
+                return render(request, 'registration/register.html', {
+                    'user_form': user_form,
+                    'password_strength': password_strength,
+                    'password_message': password_message,
+                })
+
             otp_secret = pyotp.random_base32()
+            encrypted_otp_secret = encrypt_otp_secret(otp_secret)
+            print(f"Encrypted secret before saving: {encrypted_otp_secret}")
 
-            request.session['temp_user_data'] = {
-                'username': user_form.cleaned_data['username'],
-                'email': user_form.cleaned_data['email'],
-                'password': user_form.cleaned_data['password'],
-                'otp_secret': otp_secret,
-            }
+            new_user = user_form.save(commit=False)
+            new_user.set_password(user_form.cleaned_data["password"])
+            new_user.otp_secret = encrypted_otp_secret
+            new_user.is_active = False
 
-            return redirect(reverse('setup_otp'))
+            new_user.save()
+
+            user_from_db = NoteSiteUser.objects.get(id=new_user.id)
+            print(f"Encrypted secret after saving: {user_from_db.otp_secret}")
+
+            email_verification(request, new_user, user_form.cleaned_data.get('email'))
+
+            return render(request,'registration/register_done.html',{'new_user':new_user})
 
     else:
         user_form = UserRegistrationForm()
@@ -60,96 +98,68 @@ def register(request):
                   'registration/register.html',
                   {'user_form': user_form})
 
-def setup_otp(request):
-    user_data = None
-    user_email = None
-    if request.user:
-        user_data = request.user
-        user_email = user_data.email
-        otp_secret = pyotp.random_base32()
-        user_data.otp_secret = otp_secret
+def activate(request, uidb64, token):
+    User = get_user_model()
+    try:
+        uid = force_str(urlsafe_base64_decode(uidb64))
+        user = User.objects.get(pk=uid)
+    except:
+        user = None
 
-        if request.method == 'POST':
-            otp = request.POST.get('otp')
-            totp = pyotp.TOTP(user_data.otp_secret)
-            if totp.verify(otp,valid_window=1):
-                user_data.is_2fa_enabled = True
-                user_data.save()
-                return redirect('dashboard')
+    if user is not None and account_activation_token.check_token(user, token):
+        user.is_active = True
+        user.save()
+        messages.success(request, 'You are verified! Now you can login.')
     else:
-        user_data = request.session.get('temp_user_data')
-        user_email = user_data['email']
-        if not user_data:
-            return redirect('register')
+        messages.error(request, 'Activation link is invalid!')
 
-        if request.method == 'POST':
-            otp = request.POST.get('otp')
-            totp = pyotp.TOTP(user_data['otp_secret'])
-            if totp.verify(otp,valid_window=1):
-                
-                new_user = NoteSiteUser(
-                    username=user_data['username'],
-                    email=user_data['email'],
-                    otp_secret=user_data['otp_secret'],
-                    is_2fa_enabled=True
-                )
-                new_user.set_password(user_data['password'])
-                new_user.save()
-
-                del request.session['temp_user_data']
-                login(request, new_user)
-                return redirect('dashboard')
-            else:
-                return render(request, 'registration/setup_otp.html', {
-                    'qrcode': generate_qr_code(user_data),
-                    'email': user_data['email'],
-                    'error': 'Invalid OTP. Please try again.',
-                })
-
-    return render(request, 'registration/setup_otp.html', {
-        'qrcode': generate_qr_code(user_data),
-        'email': user_email,
-    })
+    return redirect('login')
 
 NoteSiteUser = get_user_model()
 
 def verify_otp(request):
+
     if 'temp_user_id' not in request.session:
         return redirect('login') 
-
+    
     user_id = request.session['temp_user_id']
     user = NoteSiteUser.objects.get(id=user_id)
 
+    qrcode = None
+    if not user.is_2fa_enabled:
+        if(user.otp_secret == None):
+            otp_secret = pyotp.random_base32()
+            user.otp_secret = encrypt_otp_secret(otp_secret)
+            user.save()
+        qrcode = generate_qr_code(user)
+
     if request.method == 'POST':
         otp_code = request.POST.get('otp_code')
-        otp_secret = user.otp_secret
-        print(f"OTP Secret: {otp_secret}")
         
-        totp = pyotp.TOTP(otp_secret)
+        
+        otp_secret = user.otp_secret
+        decrypted_otp_secret = decrypt_otp_secret(otp_secret)
+        print(f"OTP Secret: {decrypted_otp_secret}")
+        
+        totp = pyotp.TOTP(decrypted_otp_secret)
 
         expected_otp = totp.now()
         print(f"Expected OTP: {expected_otp}, Provided OTP: {otp_code}")
 
-        if totp.verify(otp_code):
+        if totp.verify(otp_code,valid_window=1):
+            if not user.is_2fa_enabled:
+                user.is_2fa_enabled = True
+                user.save()
             del request.session['temp_user_id']
-            login(request, user)
+            login(request, user,backend='django.contrib.auth.backends.ModelBackend')
             return redirect('dashboard')
         else:
             messages.error(request, 'Invalid OTP. Please try again.')
 
+    return render(request, 'registration/otp.html', {
+        'qrcode': qrcode,
+        'email': user.email,
+    })
 
-    return render(request, 'registration/otp.html', {'user': user})
 
-def generate_qr_code(temp_user_data):
-    otp_secret = temp_user_data['otp_secret']
-    otp_uri = pyotp.totp.TOTP(otp_secret).provisioning_uri(
-        name=temp_user_data['email'],
-        issuer_name="NOTES_APP"
-    )
 
-    qr = qrcode.make(otp_uri)
-    buffer = io.BytesIO()
-    qr.save(buffer, format="PNG")
-    buffer.seek(0)
-    qr_code = base64.b64encode(buffer.getvalue()).decode("utf-8")
-    return f"data:image/png;base64,{qr_code}"

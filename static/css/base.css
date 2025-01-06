@@ -302,3 +302,54 @@ img.user-detail {
     color: #666; 
     cursor: not-allowed; 
 }
+
+.row {
+    display: flex;
+    gap: 20px; 
+    align-items: flex-start;
+}
+.column {
+    width: 50%;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.content {
+    overflow-y: auto; /* Enables scrolling */
+}
+.note_form {
+    position: sticky; 
+    top: 20px; 
+    padding: 20px;
+}
+
+
+/* .smt {
+    grid-column: 1 / -1;  
+    margin-bottom: 20px;
+    text-align: center;
+    text-decoration: underline;
+}
+
+.note {
+    border: 1px solid #ccc;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.note h2 {
+    font-size: 24px;
+    margin-bottom: 10px;
+    text-align: center;
+}
+.image-container {
+    display: flex;
+    justify-content: center;
+}
+.note img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 8px;
+}
+.note p {
+    text-align: justify;
+} */

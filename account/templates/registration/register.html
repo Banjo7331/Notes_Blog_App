@@ -8,6 +8,18 @@
     <form action="." method="post">
         {{ user_form.as_p }}
         {% csrf_token %}
+        {% if password_message %}
+            <p style="
+                color: {% if password_strength == 'very_weak' %}red
+                    {% elif password_strength == 'weak' %}orange
+                    {% elif password_strength == 'moderate' %}yellow
+                    {% elif password_strength == 'strong' %}green
+                    {% elif password_strength == 'very_strong' %}darkgreen{% endif %};
+                font-weight: bold;">
+                Password Strength: {{ password_message }}
+            </p>
+        {% endif %}
         <p><input type="submit" value="Create account"></p>
     </form>
+    
 {% endblock %}

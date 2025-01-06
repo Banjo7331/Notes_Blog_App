@@ -1,17 +1,17 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% block title %}Sent Notes Box{% endblock %}
 {% block content %}
-    <h3>Notes for You</h3>
+    <h3>All Private Notes You Received</h3>
     <div id="notes">
         {% for note in page_obj %}
         <div class="note">
             <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
-            <div>
-                {{ note.serialized_content|safe }}
-            </div>
-            <form action="{% url 'like_note' note.id %}" method="post">
+            <form method="post">
                 {% csrf_token %}
-                <button type="submit", name="note_id", class="like-button", value="{{ note.id }}">{{ note.likes.count }} {{ note.likes.count|pluralize:"Like,Likes" }}</button>
+                <input type="hidden" name="note_id" value="{{ note.id }}">
+                <label for="key">Enter Decryption Key:</label>
+                <input type="text" name="key" required>
+                <button type="submit">Decrypt</button>
             </form>
 
             {% if page_obj.has_next and forloop.last %}
@@ -25,6 +25,13 @@
         {% endfor %}
 
     </div>
+
+    {% if decrypted_message %}
+        <div>
+            <h2>Decrypted Message:</h2>
+            <p>{{ decrypted_message|safe }}</p>
+        </div>
+    {% endif %}
 
     <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
 

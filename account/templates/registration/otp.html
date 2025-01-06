@@ -1,15 +1,22 @@
-{% extends "base.html" %}
+{% extends 'base.html' %}
 
-{% block title %}Otp Verification{% endblock %}
+{% block title %}OTP verification {% endblock %}
 
 {% block content %}
-    <h1>OTP Verification</h1>
-    <p>Please enter your OTP code to continue.</p>
+
+    <h1>Two-Factor Authentication</h1>
+    <p>Scan the QR code below using your authentication app:</p>
+    <img src="{{ qrcode }}" alt="QR Code">
+    <p>Email: {{ email }}</p>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
     <form method="post">
         {% csrf_token %}
-        <label for="otp_code">OTP Code:</label>
+        <label for="otp_code">Enter OTP:</label>
         <input type="text" name="otp_code" id="otp_code" required>
-
         <button type="submit">Verify</button>
     </form>
 
@@ -20,4 +27,5 @@
             {% endfor %}
         </ul>
     {% endif %}
+
 {% endblock %}

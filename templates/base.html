@@ -23,7 +23,7 @@
         {% endif %}
         <span class="user">
             {% if request.user.is_authenticated %}
-                Welcome, {{ request.user.username }}
+                Welcome, <a href="{% url 'profile' username=user.username %}">{{ request.user.username }}</a>
                 <form method="post" action="{% url 'logout' %}">
                     {% csrf_token %}
                     <button type="submit" style="all: unset; cursor: pointer;">logout</button>
@@ -37,5 +37,6 @@
         {% block content %}
         {% endblock %}
     </div>
+    {% block scripts %}{% endblock %}
 </body>
 </html>
