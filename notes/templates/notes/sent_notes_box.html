@@ -4,34 +4,23 @@
     <h3>All Private Notes You Received</h3>
     <div id="notes">
         {% for note in page_obj %}
-        <div class="note">
-            <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
-            <form method="post">
-                {% csrf_token %}
-                <input type="hidden" name="note_id" value="{{ note.id }}">
-                <label for="key">Enter Decryption Key:</label>
-                <input type="text" name="key" required>
-                <button type="submit">Decrypt</button>
-            </form>
+            <div class="note">
+                <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
+                <br>
+                <strong>From:</strong> {{ note.author }}
+                <br>
+                <p>{{ note.content | safe}}</p>
 
-            {% if page_obj.has_next and forloop.last %}
-                <span hx-get="{% url 'dashboard' %}?page={{ page_obj.next_page_number }}"
-                    hx-swap="beforeend" hx-target="#notes" hx-select=".note"
-                    hx-trigger="revealed">
-                </span>
-            {% endif %}
-
-        </div>
+                {% if page_obj.has_next and forloop.last %}
+                    <span hx-get="{% url 'dashboard' %}?page={{ page_obj.next_page_number }}"
+                        hx-swap="beforeend" hx-target="#notes"
+                        hx-trigger="revealed">
+                    </span>
+                {% endif %}
+            </div>
         {% endfor %}
 
     </div>
-
-    {% if decrypted_message %}
-        <div>
-            <h2>Decrypted Message:</h2>
-            <p>{{ decrypted_message|safe }}</p>
-        </div>
-    {% endif %}
 
     <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
 

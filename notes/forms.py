@@ -20,15 +20,19 @@ class MarkdownNoteForm(forms.Form):
         required=False,
         max_length=20,
         label="Recipient (username, if private)",
-        help_text="Enter the username of the user to share this note with"
+        help_text="Enter the username of the user to share this note with",
+        widget=forms.TextInput(attrs={'class': 'hidden'})
     )
 
-class PublicKeyUploadForm(forms.Form):
-    content = forms.CharField(
-        widget=forms.Textarea(attrs={
-            'rows': 10,
-            'placeholder': 'Paste your public key here...'
+class OTPForm(forms.Form):
+    otp_code = forms.CharField(
+        max_length=6,
+        min_length=6,
+        widget=forms.TextInput(attrs={
+            'placeholder': 'Enter 6-digit OTP',
+            'pattern': '[0-9]{6}',  # Wymusza 6 cyfr
+            'title': '6-digit code required'
         }),
         required=True,
-        label="Public Key"
+        label="OTP Code"
     )

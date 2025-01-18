@@ -8,24 +8,35 @@ from .models import LoginIP
 
 NoteSiteUser = get_user_model()
 
-@receiver(user_locked_out)
+def get_client_ip(request):
+    x_forwarded_for = request.META.get("HTTP_X_FORWARDED_FOR")
+    if x_forwarded_for:
+        ip = x_forwarded_for.split(",")[0].strip()
+    else:
+        ip = request.META.get("REMOTE_ADDR")
+    return ip
+
 def send_lockout_email(sender, request, username, **kwargs):
     try:
         user = NoteSiteUser.objects.get(username=username)
         user_email = user.email
     except NoteSiteUser.DoesNotExist:
-        user_email = None  
+        user_email = None
+        user = None 
 
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    ip_address = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+    ip_address = get_client_ip(request)
 
-    is_new_ip = not LoginIP.objects.filter(user=user, ip_address=ip_address).exists()
+    is_new_ip = False
+    if user:
+        is_new_ip = not LoginIP.objects.filter(user=user, ip_address=ip_address).exists()
 
     if user_email:
-        subject = "Alert: Twoje konto zostało tymczasowo zablokowane"
+        subject = "Your Account Has Been Temporarily Locked"
         new_ip_message = ""
         if is_new_ip:
-            new_ip_message =  f"Blokada została wywołana z nowego adresu IP, który nie był wcześniej używany do logowania!\n\n"
+            new_ip_message = (
+                "This lockout was triggered from a NEW IP address that has never been used before!\n\n"
+            )
 
         message = (
             f"Wykryliśmy zablokowanie Twojego konta z powodu wielokrotnych nieudanych prób logowania.\n\n"
@@ -44,9 +55,7 @@ def send_lockout_email(sender, request, username, **kwargs):
 
 @receiver(user_logged_in)
 def save_login_ip(sender, request, user, **kwargs):
-
-    x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
-    ip = x_forwarded_for.split(',')[0] if x_forwarded_for else request.META.get('REMOTE_ADDR')
+    ip = get_client_ip(request)
 
     if not LoginIP.objects.filter(user=user, ip_address=ip).exists():
         LoginIP.objects.create(user=user, ip_address=ip)

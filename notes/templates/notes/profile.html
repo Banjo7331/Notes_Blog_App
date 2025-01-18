@@ -63,5 +63,33 @@
     </div>
 
     <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const privateCheckbox = document.getElementById("id_is_private");
+            const recipientLabel = document.querySelector("label[for='id_recipient_username']");
+            const recipientInput = document.getElementById("id_recipient_username");
+    
+            function toggleRecipientField() {
+                if (privateCheckbox.checked) {
+                    recipientLabel.style.display = "block";
+                    recipientInput.style.display = "block";
+                } else {
+                    recipientLabel.style.display = "none";
+                    recipientInput.style.display = "none";
+                }
+            }
+    
+            toggleRecipientField();
+    
+            privateCheckbox.addEventListener("change", toggleRecipientField);
+        });
+    </script>
+
+    <style>
+        #id_recipient_username,
+        label[for="id_recipient_username"] {
+            display: none;
+        }
+    </style>
 
 {% endblock %}

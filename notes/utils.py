@@ -3,6 +3,12 @@ import markdown
 import bleach
 from Crypto.Cipher import PKCS1_OAEP
 from Crypto.PublicKey import RSA
+from notes_keeping_site.utils import get_encryption_key
+from cryptography.hazmat.primitives.asymmetric import padding
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+import base64
 
 def sanitize_markdown(content):
     rendered_html = markdown.markdown(content)
@@ -22,6 +28,41 @@ def sanitize_markdown(content):
     )
 
     return safe_html
+
+
+def encrypt(content: str, public_key_pem: str) -> str:
+    public_key = serialization.load_pem_public_key(public_key_pem.encode())
+    encrypted_with_public_key = public_key.encrypt(
+        content.encode(),
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=SHA256()),
+            algorithm=SHA256(),
+            label=None
+        )
+    )
+
+    cipher = get_encryption_key()
+    encrypted_with_server_key = cipher.encrypt(encrypted_with_public_key)
+
+    return base64.b64encode(encrypted_with_server_key).decode()
+
+def decrypt(encrypted_data_str: str, private_key_pem: str) -> str:
+    encrypted_with_server_key = base64.b64decode(encrypted_data_str)
+
+    cipher = get_encryption_key()
+    decrypted_intermediate = cipher.decrypt(encrypted_with_server_key)
+
+    private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
+    decrypted_final = private_key.decrypt(
+        decrypted_intermediate,
+        padding.OAEP(
+            mgf=padding.MGF1(algorithm=SHA256()),
+            algorithm=SHA256(),
+            label=None
+        )
+    )
+
+    return decrypted_final.decode()
 
 def encrypt_content(content, public_key):
         rsa_key = RSA.import_key(public_key)

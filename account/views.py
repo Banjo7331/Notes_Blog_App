@@ -10,13 +10,12 @@ from django.contrib.auth.views import LoginView
 from axes.handlers.proxy import AxesProxyHandler
 from django.contrib import messages
 import pyotp
-import io
-from datetime import datetime
-import base64
+import time
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils.http import urlsafe_base64_decode
-from account.utils import email_verification, generate_qr_code, encrypt_otp_secret, decrypt_otp_secret
+from account.utils import email_verification, generate_qr_code
+from notes_keeping_site.utils import encrypt_otp_secret, decrypt_otp_secret
 from django.utils.encoding import force_str
 from account.tokens import account_activation_token
 
@@ -31,7 +30,7 @@ def user_login(request):
         form = LoginForm(request.POST)
         if form.is_valid():
             cd = form.cleaned_data
-
+            time.sleep(2)
             user = authenticate(request, username=cd['username'], password=cd['password'])
             if user is not None:
                 if user.is_active:

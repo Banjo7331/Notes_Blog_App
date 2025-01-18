@@ -30,4 +30,19 @@ class PolicyValidator:
 
         if errors:
             raise ValidationError(errors)
+    
+    def get_help_text(self):
+        """Return the password requirements for display in forms."""
+        return _(
+            "Your password must be at least %(min_length)d characters long, "
+            "contain at least %(uppercase)d uppercase letter(s), "
+            "%(numbers)d number(s), %(special)d special character(s), and "
+            "%(nonletters)d non-letter character(s)."
+        ) % {
+            'min_length': self.min_length,
+            'uppercase': self.uppercase,
+            'numbers': self.numbers,
+            'special': self.special,
+            'nonletters': self.nonletters
+        }
 

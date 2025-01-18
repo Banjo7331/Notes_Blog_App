@@ -16,8 +16,8 @@
                 {% comment %} <li {% if section == "notes" %}class="selected"{% endif %}>
                     <a href="{% url "notes" %}">Notes</a>
                 </li> {% endcomment %}
-                <li {% if section == "people" %}class="selected"{% endif %}>
-                    <a href="#">People</a>
+                <li {% if section == "sent_notes_box" %}class="selected"{% endif %}>
+                    <a href="{% url "sent_notes_box" %}">Sent notes box</a>
                 </li>
             </ul>
         {% endif %}

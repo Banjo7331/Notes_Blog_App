@@ -60,7 +60,7 @@ def encrypt_otp_secret(otp_secret: str) -> bytes:
     Szyfruje tajny klucz OTP jako dane binarne.
     """
     cipher = get_encryption_key()
-    encrypted = cipher.encrypt(otp_secret.encode())  # `otp_secret.encode()` konwertuje `str` na `bytes`
+    encrypted = cipher.encrypt(otp_secret.encode())  
     return encrypted
 
 def decrypt_otp_secret(encrypted_secret: bytes) -> str:
@@ -68,7 +68,7 @@ def decrypt_otp_secret(encrypted_secret: bytes) -> str:
     Odszyfrowuje tajny klucz OTP przechowywany jako dane binarne.
     """
     cipher = get_encryption_key()
-    decrypted = cipher.decrypt(encrypted_secret).decode()  # Wynik `decrypt` jest `bytes`, które konwertujemy na `str`
+    decrypted = cipher.decrypt(encrypted_secret).decode()  
     return decrypted
 
 policy = PasswordPolicy.from_names(

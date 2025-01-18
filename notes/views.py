@@ -1,5 +1,6 @@
 import base64
 import os
+from collections import namedtuple
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import get_user_model
@@ -9,9 +10,11 @@ from django.http import JsonResponse
 
 from account.models import Follow
 from .models import Note
-from .forms import MarkdownNoteForm, PublicKeyUploadForm
-from .utils import sanitize_markdown, encrypt_content, decrypt_content
+from .forms import MarkdownNoteForm, OTPForm
+from .utils import sanitize_markdown, encrypt, decrypt
+from notes_keeping_site.utils import decrypt_otp_secret, generate_rsa_key_pair_for_user, get_private_key, sign_note, verify_signature
 from django.db.models import Count
+import pyotp
 
 NoteSiteUser = get_user_model()
 
@@ -22,7 +25,7 @@ def LikeView(request, note_id):
         note.likes.remove(request.user)
     else:
         note.likes.add(request.user)
-    return redirect('profile', username=note.user.username)
+    return redirect('profile', username=note.author.username)
 
 @login_required
 def FallowView(request, user_id):
@@ -49,7 +52,9 @@ def profile_view(request, username):
 
     is_following = Follow.objects.filter(follower=request.user, following=profile_user).exists() if request.user.is_authenticated else False
     print(is_following)
-    user_notes = Note.objects.filter(author=profile_user).order_by('-created_at')
+    user_notes = Note.objects.filter(author=profile_user,is_private=False).order_by('-created_at')
+
+    verified_notes = [note for note in user_notes if verify_signature(note.author, note.serialized_content, note.signature)]
 
     is_obligated = request.user.is_key_enabled
     is_owner = request.user.is_authenticated and profile_user == request.user
@@ -73,14 +78,18 @@ def profile_view(request, username):
 
                 sanitized_html = sanitize_markdown(raw_content)
 
+
                 aes_key = None
                 if is_private:
-                    sanitized_html = encrypt_content(sanitized_html, recipient.public_key)
+                    sanitized_html = encrypt(sanitized_html, recipient.public_key)
+
+                signature = sign_note(request.user, sanitized_html)
 
                 Note.objects.create(
                     author=request.user,
                     title=title,
                     serialized_content=sanitized_html,
+                    signature=signature,
                     is_private=is_private,
                     recipient=recipient
                 )
@@ -97,29 +106,31 @@ def profile_view(request, username):
 
     elif is_owner and not is_obligated:
         if request.method == 'POST':
-            form = PublicKeyUploadForm(request.POST)
-            if form.is_valid():
-                public_key = form.cleaned_data['content']
-                
-                try:
-                    from cryptography.hazmat.primitives.serialization import load_pem_public_key
-                    load_pem_public_key(public_key.encode())
-                except Exception:
-                    return JsonResponse({"error": "Invalid public key format."}, status=400)
-                
-                user = request.user
-                user.public_key = public_key
+            otp_code = request.POST.get('otp_code')
+            
+            user = request.user
+            otp_secret = user.otp_secret
+            
+            decrypted_otp_secret = decrypt_otp_secret(otp_secret)
+            print(f"OTP Secret: {decrypted_otp_secret}")
+            
+            totp = pyotp.TOTP(decrypted_otp_secret)
+            
+            if totp.verify(otp_code, valid_window=1):
+                generate_rsa_key_pair_for_user(user)
                 user.is_key_enabled = True
                 user.save()
-                messages.success(request, 'You can now make notes.')
+                messages.success(request, 'OTP verified. You can now make notes.')
                 return redirect('profile', username=username)
+            else:
+                return JsonResponse({"error": "Invalid OTP code."}, status=400)
         else:
-            form = PublicKeyUploadForm()
+            form = OTPForm() 
     else:
-        form =  None
+        form = None
 
     page_number = request.GET.get('page', 1)
-    paginator = Paginator(user_notes, 7)
+    paginator = Paginator(verified_notes, 7)
     page_obj = paginator.get_page(page_number)
 
     return render(request, 'notes/profile.html', {
@@ -134,46 +145,58 @@ def profile_view(request, username):
 @login_required
 def sent_notes_box(request):
     user = request.user
-    sent_notes = Note.objects.filter(recipient=user).order_by('-created_at')
+    sent_notes = Note.objects.filter(is_private=True,recipient=user).order_by('-created_at')
+    verified_notes = [note for note in sent_notes if verify_signature(note.author, note.serialized_content, note.signature)]
+    print(len(verified_notes))
+    private_key = get_private_key(user.id)
+
+    DecryptedNote = namedtuple('DecryptedNote', ['author', 'title', 'created_at', 'content'])
+
+    decrypted_notes = []
+    for note in verified_notes:
+        try:
+            decrypted_content = decrypt(note.serialized_content, private_key) if private_key else "🔒 No private key found"
+        except Exception as e:
+            decrypted_content = f"❌ Decryption error: {str(e)}"
+        
+        temp_note = DecryptedNote(
+            title=note.title, 
+            created_at=note.created_at, 
+            author=note.author.username if note.author else "Unknown Sender",
+            content=decrypted_content
+        )
+        decrypted_notes.append(temp_note)
 
     page_number = request.GET.get('page', 1)
-    paginator = Paginator(sent_notes, 7)
+    paginator = Paginator(decrypted_notes, 7)  
     page_obj = paginator.get_page(page_number)
 
-    decrypted_message = None
-
-    if request.method == 'POST':
-        note_id = request.POST.get('note_id')
-        private_key = request.POST.get('private_key')
-        print("test")
-        try:
-            note = Note.objects.get(id=note_id, recipient=user)
-            print("is there any?")
-            decrypted_message = decrypt_content(note.serialized_content, private_key)
-            print(decrypted_message, "is there any?")
-        except Exception as e:
-            print("fak")
-            messages.error(request, f"Decryption failed: {str(e)}")
-
-    return render(request, 'notes/sent_notes_box.html',  {'decrypted_message': decrypted_message,'page_obj': page_obj})
+    return render(request, 'notes/sent_notes_box.html', {'page_obj': page_obj})
 
 @login_required
 def dashboard(request):
     user = request.user
 
-    notes = Note.objects.annotate(like_count=Count('likes')).order_by('-like_count', '-created_at')
-    
+    notes = Note.objects.filter(is_private=False).annotate(like_count=Count('likes')).order_by('-like_count', '-created_at')
+    verified_notes = [note for note in notes if verify_signature(note.author, note.serialized_content, note.signature)]
+
+    if verified_notes:
+        verified_notes = Note.objects.filter(id__in=[note.id for note in verified_notes])
+    else:
+        verified_notes = Note.objects.none()
+
     if Follow.objects.filter(follower=user).exists():
         follower_notes = Note.objects.filter(
-            user__in=Follow.objects.filter(follower=user).values_list('following', flat=True)
+            is_private=False,
+            author__in=Follow.objects.filter(follower=user).values_list('following', flat=True)
         ).annotate(
             like_count=Count('likes')
         ).order_by('-created_at')
 
-        notes = notes | follower_notes
+        verified_notes = verified_notes | follower_notes
 
     page_number = request.GET.get('page', 1)
-    paginator = Paginator(notes, 7)
+    paginator = Paginator(verified_notes, 7)
     page_obj = paginator.get_page(page_number)
 
     return render(request, 'notes/dashboard.html', {'section': 'dashboard', 'page_obj': page_obj})
