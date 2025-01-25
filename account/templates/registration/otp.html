@@ -15,17 +15,8 @@
 
     <form method="post">
         {% csrf_token %}
-        <label for="otp_code">Enter OTP:</label>
-        <input type="text" name="otp_code" id="otp_code" required>
+        {{ form.as_p }} 
         <button type="submit">Verify</button>
     </form>
-
-    {% if messages %}
-        <ul>
-            {% for message in messages %}
-                <li style="color: red;">{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
+    
 {% endblock %}

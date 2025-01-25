@@ -11,11 +11,14 @@ from django.http import JsonResponse
 from django.contrib.auth.password_validation import validate_password
 from account.models import Follow
 from .models import Note
-from .forms import MarkdownNoteForm, OTPForm
+from .forms import MarkdownNoteForm
+from notes_keeping_site.forms import OTPForm  
 from .utils import sanitize_markdown, encrypt, decrypt
 from notes_keeping_site.utils import decrypt_otp_secret, sign_note, verify_signature, evaluate_password_strength
 from django.db.models import Count
 import pyotp
+from uuid import UUID
+
 
 NoteSiteUser = get_user_model()
 
@@ -71,9 +74,7 @@ def profile_view(request, username):
                 note_password = form.cleaned_data['password']
 
                 sanitized_html = sanitize_markdown(raw_content)
-                
                 print("POST data:", request.POST)
-                recipient = None
                 if is_private:
                     password_strength, password_message = evaluate_password_strength(note_password)
 
@@ -85,6 +86,10 @@ def profile_view(request, username):
 
                     recipients = list(NoteSiteUser.objects.filter(username__in=usernames))
 
+                    if not recipients:
+                        messages.error(request, "Private notes must have at least one recipient.")
+                        return redirect('profile', username=username)
+
                     found_usernames = set(user.username for user in recipients)
                     invalid_usernames = [u for u in usernames if u not in found_usernames]
 
@@ -92,19 +97,20 @@ def profile_view(request, username):
                         messages.error(request, f"One or more recipients not found")
                         return redirect('profile', username=username)
                     
-                    sanitized_html = encrypt(sanitized_html, )
+                    sanitized_html = encrypt(sanitized_html, note_password)
 
                    
                 signature = sign_note(request.user, sanitized_html)
 
-                Note.objects.create(
+                new_note = Note.objects.create(
                     author=request.user,
                     title=title,
                     serialized_content=sanitized_html,
                     signature=signature,
-                    is_private=is_private,
-                    recipient=recipient
+                    is_private=is_private
                 )
+                if is_private and recipients:
+                    new_note.recipients.set(recipients)
 
                 # if is_private and aes_key:
                 #     return JsonResponse({
@@ -117,24 +123,28 @@ def profile_view(request, username):
             form = MarkdownNoteForm() 
 
     elif is_owner and not is_obligated:
+            
         if request.method == 'POST':
-            otp_code = request.POST.get('otp_code')
+            form = OTPForm(request.POST)
+
+            if form.is_valid():
+                otp_code = form.cleaned_data["otp_code"]\
             
-            user = request.user
-            otp_secret = user.otp_secret
-            
-            decrypted_otp_secret = decrypt_otp_secret(otp_secret)
-            print(f"OTP Secret: {decrypted_otp_secret}")
-            
-            totp = pyotp.TOTP(decrypted_otp_secret)
-            
-            if totp.verify(otp_code, valid_window=1):
-                user.is_key_enabled = True
-                user.save()
-                messages.success(request, 'OTP verified. You can now make notes.')
-                return redirect('profile', username=username)
-            else:
-                return JsonResponse({"error": "Invalid OTP code."}, status=400)
+                user = request.user
+                otp_secret = user.otp_secret
+                
+                decrypted_otp_secret = decrypt_otp_secret(otp_secret)
+                print(f"OTP Secret: {decrypted_otp_secret}")
+                
+                totp = pyotp.TOTP(decrypted_otp_secret)
+                
+                if totp.verify(otp_code, valid_window=1):
+                    user.is_key_enabled = True
+                    user.save()
+                    messages.success(request, 'OTP verified. You can now make notes.')
+                    return redirect('profile', username=username)
+                else:
+                    messages.error(request, 'Invalid OTP. Please try again.')
         else:
             form = OTPForm() 
     else:

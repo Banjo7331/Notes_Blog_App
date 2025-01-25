@@ -29,6 +29,9 @@ def sign_note(user, note_content: str) -> str:
     try:
         secret_key = get_encryption_key()  
 
+        if isinstance(secret_key, Fernet):  
+            secret_key = secret_key._signing_key
+
         data_to_sign = json.dumps({
             "author_id": str(user.id),
             "content": note_content,
@@ -45,8 +48,11 @@ def verify_signature(author, note_content: str, signature_b64: str) -> bool:
     try:
         secret_key = get_encryption_key()  
 
+        if isinstance(secret_key, Fernet):  
+            secret_key = secret_key._signing_key
+
         data_to_verify = json.dumps({
-            "author_id": author.id,
+            "author_id": str(author.id),
             "content": note_content,
         }, separators=(",", ":"), sort_keys=True).encode()
 
@@ -57,6 +63,7 @@ def verify_signature(author, note_content: str, signature_b64: str) -> bool:
         return hmac.compare_digest(expected_signature, provided_signature)
 
     except Exception:
+        print("Błąd weryfikacji podpisu")
         return False
 
 

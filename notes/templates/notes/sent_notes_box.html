@@ -27,10 +27,10 @@
                 <p><strong>Data:</strong> {{ note.created_at }}</p>
                 <p id="content-{{ note.id }}"><strong>Treść:</strong> 🔒 Wpisz hasło, aby odszyfrować</p>
 
-                <form onsubmit="decryptNote(event, {{ note.id }})">
+                <form>
                     {% csrf_token %}
                     <input type="password" id="password-{{ note.id }}" placeholder="Podaj hasło">
-                    <button type="submit">Odszyfruj</button>
+                    <button type="submit" onclick="decryptNote(event, '{{ note.id }}')">Odszyfruj</button>
                 </form>
             </div>
             <hr>
@@ -41,27 +41,38 @@
     <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
     <script>
         function decryptNote(event, noteId) {
-            event.preventDefault();  // Zapobiega przeładowaniu strony
+            event.preventDefault();  // 🚀 Zapobiega przeładowaniu strony!
+        
             let password = document.getElementById(`password-${noteId}`).value;
             let contentField = document.getElementById(`content-${noteId}`);
         
-            fetch(`/decrypt-note/${noteId}/`, {
+            let csrfToken = document.querySelector("input[name=csrfmiddlewaretoken]").value;
+        
+            console.log(`🔍 Wysyłam POST do /decrypt-note/${noteId}/ z hasłem: ${password}`);
+        
+            fetch(`/notes/decrypt-note/${noteId}/`, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/x-www-form-urlencoded",
-                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+                    "X-CSRFToken": csrfToken
                 },
                 body: `password=${encodeURIComponent(password)}`
             })
-            .then(response => response.json())
+            .then(response => {
+                console.log("📡 Odpowiedź serwera, status:", response.status); // Debugowanie
+                return response.json();
+            })
             .then(data => {
+                console.log("📡 Dane z serwera:", data); // Debugowanie
+        
                 if (data.content) {
                     contentField.innerHTML = `<strong>Treść:</strong> ${data.content}`;
                 } else {
-                    contentField.innerHTML = `<strong>Treść:</strong> ❌ ${data.error}`;
+                    contentField.innerHTML = `<strong>Treść:</strong> ❌ ${data.error || "Nieznany błąd"}`;
                 }
             })
             .catch(error => {
+                console.error("❌ Błąd Fetch:", error);
                 contentField.innerHTML = `<strong>Treść:</strong> ❌ Błąd połączenia`;
             });
         }

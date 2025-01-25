@@ -52,11 +52,11 @@
         {% endif %}
         {% if is_owner and not is_obligated %}
             <div class="column note_form">
-                <h2>Upload Your Public Key If You Want To Send Notes</h2>
+                <h2>Verify otp if you want to send notes</h2>
                 <form method="post">
                     {% csrf_token %}
                     {{ form.as_p }}
-                    <button type="submit">Save Public Key</button>
+                    <button type="submit">Verify</button>
                 </form>
             </div>
         {% endif %}
@@ -66,22 +66,22 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const privateCheckbox = document.getElementById("id_is_private");
-            const recipientLabel = document.querySelector("label[for='id_recipient_username']");
-            const recipientInput = document.getElementById("id_recipient_username");
-    
-            function toggleRecipientField() {
+            const recipientField = document.getElementById("id_recipient_usernames"); // poprawiona nazwa
+            const passwordField = document.getElementById("id_password");
+        
+            function toggleFields() {
                 if (privateCheckbox.checked) {
-                    recipientLabel.style.display = "block";
-                    recipientInput.style.display = "block";
+                    recipientField.closest("p").style.display = "block"; // Pokaż pole
+                    passwordField.closest("p").style.display = "block"; // Pokaż pole
                 } else {
-                    recipientLabel.style.display = "none";
-                    recipientInput.style.display = "none";
+                    recipientField.closest("p").style.display = "none"; // Ukryj pole
+                    passwordField.closest("p").style.display = "none"; // Ukryj pole
                 }
             }
-    
-            toggleRecipientField();
-    
-            privateCheckbox.addEventListener("change", toggleRecipientField);
+        
+            toggleFields(); // Ukryj pola na starcie
+        
+            privateCheckbox.addEventListener("change", toggleFields);
         });
     </script>
 
@@ -90,6 +90,11 @@
         label[for="id_recipient_username"] {
             display: none;
         }
+        #id_password
+        label[for="id_recipient_username"] {
+            display: none;
+        }
+        </style>
     </style>
 
 {% endblock %}

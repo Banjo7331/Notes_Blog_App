@@ -15,6 +15,7 @@ from django.core.exceptions import ValidationError
 from django.utils.http import urlsafe_base64_decode
 from account.utils import email_verification, generate_qr_code
 from notes_keeping_site.utils import encrypt_otp_secret, decrypt_otp_secret, evaluate_password_strength
+from notes_keeping_site.forms import OTPForm
 from django.utils.encoding import force_str
 from account.tokens import account_activation_token
 import uuid
@@ -133,29 +134,32 @@ def verify_otp(request):
         qrcode = generate_qr_code(user)
 
     if request.method == 'POST':
-        otp_code = request.POST.get('otp_code')
-        
-        
-        otp_secret = user.otp_secret
-        decrypted_otp_secret = decrypt_otp_secret(otp_secret)
-        print(f"OTP Secret: {decrypted_otp_secret}")
-        
-        totp = pyotp.TOTP(decrypted_otp_secret)
+        form = OTPForm(request.POST)
+        if form.is_valid():
+            otp_code = form.cleaned_data["otp_code"]
+            otp_secret = user.otp_secret
+            decrypted_otp_secret = decrypt_otp_secret(otp_secret)
+            print(f"OTP Secret: {decrypted_otp_secret}")
+            
+            totp = pyotp.TOTP(decrypted_otp_secret)
 
-        expected_otp = totp.now()
-        print(f"Expected OTP: {expected_otp}, Provided OTP: {otp_code}")
+            expected_otp = totp.now()
+            print(f"Expected OTP: {expected_otp}, Provided OTP: {otp_code}")
 
-        if totp.verify(otp_code,valid_window=1):
-            if not user.is_2fa_enabled:
-                user.is_2fa_enabled = True
-                user.save()
-            del request.session['temp_user_id']
-            login(request, user,backend='django.contrib.auth.backends.ModelBackend')
-            return redirect('dashboard')
-        else:
-            messages.error(request, 'Invalid OTP. Please try again.')
+            if totp.verify(otp_code,valid_window=1):
+                if not user.is_2fa_enabled:
+                    user.is_2fa_enabled = True
+                    user.save()
+                del request.session['temp_user_id']
+                login(request, user,backend='django.contrib.auth.backends.ModelBackend')
+                return redirect('dashboard')
+            else:
+                messages.error(request, 'Invalid OTP. Please try again.')
+    else:
+        form = OTPForm()
 
     return render(request, 'registration/otp.html', {
+        'form': form,
         'qrcode': qrcode,
         'email': user.email,
     })

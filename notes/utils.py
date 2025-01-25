@@ -12,12 +12,13 @@ from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 import base64
+from cryptography.fernet import Fernet, InvalidToken
 
 def sanitize_markdown(content):
     rendered_html = markdown.markdown(content)
 
     allowed_tags = [
-        'b','img','a','i','h1','h2','h3','h4','h5','h6'
+        'b','p','img','a','i','h1','h2','h3','h4','h5'
     ]
     allowed_attrs = {
         'img': ['src', 'alt'],  
@@ -59,42 +60,47 @@ def encrypt(content: str, password: str) -> str:
     return base64.b64encode(salt + iv + encrypted_with_server_key).decode()
 
 def decrypt(encrypted_data_str: str, password: str) -> str:
-    """
-    Odszyfrowuje dane, które zostały zaszyfrowane w `encrypt()`
-    """
-    # 1. Dekodujemy dane z Base64
-    encrypted_data = base64.b64decode(encrypted_data_str)
+    try:
+        encrypted_data = base64.b64decode(encrypted_data_str)
 
-    # 2. Pobieramy wartości: sól (16 bajtów), IV (16 bajtów), zaszyfrowana treść
-    salt = encrypted_data[:16]
-    iv = encrypted_data[16:32]
-    encrypted_with_server_key = encrypted_data[32:]
+        salt = encrypted_data[:16]
+        iv = encrypted_data[16:32]
+        encrypted_with_server_key = encrypted_data[32:]
 
-    # 3. Odszyfrowujemy kluczem serwera
-    cipher_server = get_encryption_key()
-    decrypted_intermediate = cipher_server.decryptor().update(encrypted_with_server_key)
+        cipher_server = get_encryption_key()
 
-    # 4. Tworzymy klucz AES z hasła użytkownika (KDF)
-    kdf = PBKDF2HMAC(
-        algorithm=hashes.SHA256(),
-        length=32,
-        salt=salt,
-        iterations=100000,
-    )
-    aes_key = kdf.derive(password.encode())
+        if not isinstance(cipher_server, Fernet):
+            return "❌ Błąd w procesie - prosimy spróbowac ponownie później"
 
-    # 5. Tworzymy szyfr AES do odszyfrowania
-    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
-    decryptor = cipher.decryptor()
+        try:
+            decrypted_intermediate = cipher_server.decrypt(encrypted_with_server_key)
+        except InvalidToken:
+            return "❌ Błąd w procesie - prosimy spróbowac ponownie później"
 
-    # 6. Odszyfrowujemy treść
-    decrypted_padded_content = decryptor.update(decrypted_intermediate) + decryptor.finalize()
+        kdf = PBKDF2HMAC(
+            algorithm=hashes.SHA256(),
+            length=32,
+            salt=salt,
+            iterations=100000,
+        )
+        aes_key = kdf.derive(password.encode())
 
-    # 7. Usuwamy padding
-    pad_length = decrypted_padded_content[-1]
-    decrypted_content = decrypted_padded_content[:-pad_length]
+        cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+        decryptor = cipher.decryptor()
 
-    return decrypted_content.decode()
+        decrypted_padded_content = decryptor.update(decrypted_intermediate) + decryptor.finalize()
+
+        pad_length = decrypted_padded_content[-1]
+
+        if pad_length > 16:
+            return "❌ Niepoprawne hasło"
+
+        decrypted_content = decrypted_padded_content[:-pad_length]
+
+        return decrypted_content.decode("utf-8")
+
+    except Exception as e:
+        return "❌ Błąd w procesie - prosimy spróbowac ponownie później"
 
 def encrypt_content(content, public_key):
         rsa_key = RSA.import_key(public_key)

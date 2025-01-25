@@ -3,13 +3,6 @@
 {% block title %}Login{% endblock %}
 
 {% block content %}
-    {% if messages %}
-        <ul class="messages">
-            {% for message in messages %}
-                <li class="{{ message.tags }}">{{ message }}</li>
-            {% endfor %}
-        </ul>
-    {% endif %}
     <h2>Login</h2>
     {% if form.errors %}
         <p>Your username and password didn't match. Please try again.</p>
