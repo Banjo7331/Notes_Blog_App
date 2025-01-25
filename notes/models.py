@@ -7,7 +7,7 @@ from notes_keeping_site import settings
 class Note(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     author = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="notes")
-    recipient = models.ForeignKey(settings.AUTH_USER_MODEL,on_delete=models.CASCADE,related_name="received_notes",null=True,blank=True) 
+    recipients = models.ManyToManyField(settings.AUTH_USER_MODEL, related_name="received_notes", blank=True)
     is_private = models.BooleanField(default=False)
     title = models.CharField(max_length=255)
     serialized_content = models.TextField()

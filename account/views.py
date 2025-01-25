@@ -4,7 +4,6 @@ from django.contrib.auth import authenticate, login, get_user_model
 from django.contrib.auth.decorators import login_required
 from django.urls import reverse
 from account.models import NoteSiteUser
-from account.utils import evaluate_password_strength
 from .forms import LoginForm, UserRegistrationForm
 from django.contrib.auth.views import LoginView
 from axes.handlers.proxy import AxesProxyHandler
@@ -15,9 +14,10 @@ from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.utils.http import urlsafe_base64_decode
 from account.utils import email_verification, generate_qr_code
-from notes_keeping_site.utils import encrypt_otp_secret, decrypt_otp_secret
+from notes_keeping_site.utils import encrypt_otp_secret, decrypt_otp_secret, evaluate_password_strength
 from django.utils.encoding import force_str
 from account.tokens import account_activation_token
+import uuid
 
 def user_login(request):
     storage = messages.get_messages(request)
@@ -34,7 +34,7 @@ def user_login(request):
             user = authenticate(request, username=cd['username'], password=cd['password'])
             if user is not None:
                 if user.is_active:
-                    request.session['temp_user_id'] = user.id
+                    request.session['temp_user_id'] = str(user.id)
 
                     return redirect('verify_otp') 
                 else:
@@ -122,7 +122,7 @@ def verify_otp(request):
         return redirect('login') 
     
     user_id = request.session['temp_user_id']
-    user = NoteSiteUser.objects.get(id=user_id)
+    user = NoteSiteUser.objects.get(id=uuid.UUID(user_id))
 
     qrcode = None
     if not user.is_2fa_enabled:

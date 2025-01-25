@@ -3,7 +3,7 @@
 {% block content %}
     <h3>All Private Notes You Received</h3>
     <div id="notes">
-        {% for note in page_obj %}
+        {% comment %} {% for note in page_obj %}
             <div class="note">
                 <strong>{{ note.title }}</strong> - {{ note.created_at|date:"M d, Y H:i" }}
                 <br>
@@ -18,11 +18,53 @@
                     </span>
                 {% endif %}
             </div>
+        {% endfor %} {% endcomment %}
+
+        {% for note in page_obj %}
+            <div class="note" id="note-{{ note.id }}">
+                <h3>{{ note.title }}</h3>
+                <p><strong>Od:</strong> {{ note.author.username }}</p>
+                <p><strong>Data:</strong> {{ note.created_at }}</p>
+                <p id="content-{{ note.id }}"><strong>Treść:</strong> 🔒 Wpisz hasło, aby odszyfrować</p>
+
+                <form onsubmit="decryptNote(event, {{ note.id }})">
+                    {% csrf_token %}
+                    <input type="password" id="password-{{ note.id }}" placeholder="Podaj hasło">
+                    <button type="submit">Odszyfruj</button>
+                </form>
+            </div>
+            <hr>
         {% endfor %}
 
     </div>
 
     <script src="https://unpkg.com/htmx.org@1.9.6" integrity="sha384-FhXw7b6AlE/jyjlZH5iHa/tTe9EpJ1Y55RjcgPbjeWMskSxZt1v9qkxLJWNJaGni" crossorigin="anonymous"></script>
-
+    <script>
+        function decryptNote(event, noteId) {
+            event.preventDefault();  // Zapobiega przeładowaniu strony
+            let password = document.getElementById(`password-${noteId}`).value;
+            let contentField = document.getElementById(`content-${noteId}`);
+        
+            fetch(`/decrypt-note/${noteId}/`, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                    "X-CSRFToken": document.querySelector("[name=csrfmiddlewaretoken]").value
+                },
+                body: `password=${encodeURIComponent(password)}`
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.content) {
+                    contentField.innerHTML = `<strong>Treść:</strong> ${data.content}`;
+                } else {
+                    contentField.innerHTML = `<strong>Treść:</strong> ❌ ${data.error}`;
+                }
+            })
+            .catch(error => {
+                contentField.innerHTML = `<strong>Treść:</strong> ❌ Błąd połączenia`;
+            });
+        }
+    </script>
 
 {% endblock %}

@@ -9,7 +9,6 @@ class NoteSiteUser(AbstractUser):
     email = models.EmailField(unique=True)
     otp_secret = models.BinaryField()
     is_2fa_enabled = models.BooleanField(default=False)
-    public_key = models.TextField(blank=True, null=True) 
     is_key_enabled = models.BooleanField(default=False)
     
 

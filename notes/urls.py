@@ -3,6 +3,7 @@ from . import views
 
 urlpatterns = [
     path('sent-notes-box/', views.sent_notes_box, name='sent_notes_box'),
+    path('decrypt-note/<int:note_id>/', views.decrypt_note, name='decrypt_note'),
     path('profile/<str:username>/', views.profile_view, name='profile'),
     path('like/<int:note_id>/', views.LikeView, name='like_note'),
     path('follow/<int:user_id>/', views.FallowView, name='user_follow'),

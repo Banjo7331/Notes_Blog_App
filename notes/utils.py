@@ -1,4 +1,5 @@
 import base64
+import os
 import markdown
 import bleach
 from Crypto.Cipher import PKCS1_OAEP
@@ -8,6 +9,8 @@ from cryptography.hazmat.primitives.asymmetric import padding
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+from cryptography.hazmat.primitives import hashes
 import base64
 
 def sanitize_markdown(content):
@@ -30,39 +33,68 @@ def sanitize_markdown(content):
     return safe_html
 
 
-def encrypt(content: str, public_key_pem: str) -> str:
-    public_key = serialization.load_pem_public_key(public_key_pem.encode())
-    encrypted_with_public_key = public_key.encrypt(
-        content.encode(),
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=SHA256()),
-            algorithm=SHA256(),
-            label=None
-        )
+def encrypt(content: str, password: str) -> str:
+    salt = os.urandom(16)
+
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,  
+        salt=salt,
+        iterations=100000, 
     )
+    aes_key = kdf.derive(password.encode())
+    iv = os.urandom(16)
 
-    cipher = get_encryption_key()
-    encrypted_with_server_key = cipher.encrypt(encrypted_with_public_key)
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+    encryptor = cipher.encryptor()
 
-    return base64.b64encode(encrypted_with_server_key).decode()
+    pad_length = 16 - (len(content) % 16)
+    padded_content = content + chr(pad_length) * pad_length
 
-def decrypt(encrypted_data_str: str, private_key_pem: str) -> str:
-    encrypted_with_server_key = base64.b64decode(encrypted_data_str)
+    encrypted_content = encryptor.update(padded_content.encode()) + encryptor.finalize()
 
-    cipher = get_encryption_key()
-    decrypted_intermediate = cipher.decrypt(encrypted_with_server_key)
+    cipher_server = get_encryption_key()
+    encrypted_with_server_key = cipher_server.encrypt(encrypted_content)
 
-    private_key = serialization.load_pem_private_key(private_key_pem.encode(), password=None)
-    decrypted_final = private_key.decrypt(
-        decrypted_intermediate,
-        padding.OAEP(
-            mgf=padding.MGF1(algorithm=SHA256()),
-            algorithm=SHA256(),
-            label=None
-        )
+    return base64.b64encode(salt + iv + encrypted_with_server_key).decode()
+
+def decrypt(encrypted_data_str: str, password: str) -> str:
+    """
+    Odszyfrowuje dane, które zostały zaszyfrowane w `encrypt()`
+    """
+    # 1. Dekodujemy dane z Base64
+    encrypted_data = base64.b64decode(encrypted_data_str)
+
+    # 2. Pobieramy wartości: sól (16 bajtów), IV (16 bajtów), zaszyfrowana treść
+    salt = encrypted_data[:16]
+    iv = encrypted_data[16:32]
+    encrypted_with_server_key = encrypted_data[32:]
+
+    # 3. Odszyfrowujemy kluczem serwera
+    cipher_server = get_encryption_key()
+    decrypted_intermediate = cipher_server.decryptor().update(encrypted_with_server_key)
+
+    # 4. Tworzymy klucz AES z hasła użytkownika (KDF)
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
     )
+    aes_key = kdf.derive(password.encode())
 
-    return decrypted_final.decode()
+    # 5. Tworzymy szyfr AES do odszyfrowania
+    cipher = Cipher(algorithms.AES(aes_key), modes.CBC(iv))
+    decryptor = cipher.decryptor()
+
+    # 6. Odszyfrowujemy treść
+    decrypted_padded_content = decryptor.update(decrypted_intermediate) + decryptor.finalize()
+
+    # 7. Usuwamy padding
+    pad_length = decrypted_padded_content[-1]
+    decrypted_content = decrypted_padded_content[:-pad_length]
+
+    return decrypted_content.decode()
 
 def encrypt_content(content, public_key):
         rsa_key = RSA.import_key(public_key)
@@ -87,3 +119,4 @@ def decrypt_content(content, private_key):
         print("Error Loading Key or Decrypting Content:", str(e))
     except Exception as e:
         print("Unexpected Error:", str(e))
+

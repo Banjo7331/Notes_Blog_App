@@ -3,10 +3,12 @@ from django.contrib.auth import get_user_model
 
 class MarkdownNoteForm(forms.Form):
     title = forms.CharField(
-        max_length=255,
+        required=True,
+        max_length=15,
         widget=forms.TextInput(attrs={'placeholder': 'Enter note title'})
     )
     content = forms.CharField(
+        max_length=200,
         widget=forms.Textarea(attrs={'rows': 10, 'placeholder': 'Write your Markdown note here...'}),
         required=True
     )
@@ -16,12 +18,17 @@ class MarkdownNoteForm(forms.Form):
         label="Private",
         help_text="Check to make this note private"
     )
-    recipient_username = forms.CharField(
+    recipient_usernames = forms.CharField(
         required=False,
-        max_length=20,
-        label="Recipient (username, if private)",
-        help_text="Enter the username of the user to share this note with",
-        widget=forms.TextInput(attrs={'class': 'hidden'})
+        label="Recipients",
+        help_text="Enter multiple usernames separated by commas",
+        widget=forms.TextInput(attrs={'placeholder': 'e.g., user1, user2, user3'})
+    )
+    password = forms.CharField(
+        max_length=15,
+        required=False,
+        widget=forms.PasswordInput(attrs={'placeholder': 'Enter encryption password'}),
+        help_text="If set, this password will encrypt your note."
     )
 
 class OTPForm(forms.Form):
