@@ -17,11 +17,6 @@ class NoteSiteUser(AbstractUser):
             return getattr(self, key)
         raise KeyError(f"Key '{key}' does not exist in NoteSiteUser.")
 
-class LoginIP(models.Model):
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
-    user = models.ForeignKey(NoteSiteUser, on_delete=models.CASCADE, related_name='login_ips')
-    ip_address = models.GenericIPAddressField()
-
 class Follow(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     follower = models.ForeignKey(NoteSiteUser, related_name='following', on_delete=models.CASCADE)

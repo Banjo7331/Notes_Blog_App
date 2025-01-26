@@ -25,21 +25,9 @@ class MarkdownNoteForm(forms.Form):
         widget=forms.TextInput(attrs={'placeholder': 'e.g., user1, user2, user3'})
     )
     password = forms.CharField(
-        max_length=15,
+        max_length=20,
+        min_length=8,
         required=False,
         widget=forms.PasswordInput(attrs={'placeholder': 'Enter encryption password'}),
         help_text="If set, this password will encrypt your note."
-    )
-
-class OTPForm(forms.Form):
-    otp_code = forms.CharField(
-        max_length=6,
-        min_length=6,
-        widget=forms.TextInput(attrs={
-            'placeholder': 'Enter 6-digit OTP',
-            'pattern': '[0-9]{6}',  # Wymusza 6 cyfr
-            'title': '6-digit code required'
-        }),
-        required=True,
-        label="OTP Code"
     )

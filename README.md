@@ -47,8 +47,8 @@ Moduł uwierzytelniania realizuje następujące wymagania:
 
 ### Główne wymagania:
 1. **Skonteneryzowanie aplikacji za pomocą Docker**:
-   - Uruchamianie za pomocą `$ docker-compose up` lub `$ sh run-docker.sh`.
-   - Brak realizacji tego punktu obniża ocenę maksymalnie do 75%.
+   - Uruchamianie za pomocą:
+     - `$ docker-compose up --build`
 
 2. **Baza danych**:
    - Obsługa bazy danych SQL (np. SQLite).
@@ -78,11 +78,6 @@ Moduł uwierzytelniania realizuje następujące wymagania:
 ## Elementy dodatkowe
 
 - Zabezpieczenie przed Cross-Site Request Forgery (CSRF).
-- Możliwość odzyskania dostępu w przypadku utraty hasła.
-- Monitorowanie systemu:
-  - Powiadamianie użytkownika o nowych urządzeniach logujących się na konto.
 - Wykorzystanie honeypots.
-- Mechanizm Content-Security-Policy.
-- Wyłączenie nagłówka `Server`.
 
 ---

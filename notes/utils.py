@@ -13,6 +13,8 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.primitives import hashes
 import base64
 from cryptography.fernet import Fernet, InvalidToken
+import re
+from django.core.exceptions import ValidationError
 
 def sanitize_markdown(content):
     rendered_html = markdown.markdown(content)
@@ -125,4 +127,9 @@ def decrypt_content(content, private_key):
         print("Error Loading Key or Decrypting Content:", str(e))
     except Exception as e:
         print("Unexpected Error:", str(e))
+
+def validate_usernames(value):
+    if not re.match(r'^[a-zA-Z0-9, ]+$', value):
+        raise ValidationError("Usernames must only contain letters, numbers, and commas.")
+    return value
 

@@ -1,11 +1,6 @@
 import os
 from django.conf import settings
 from cryptography.fernet import Fernet
-from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.hazmat.primitives import serialization
-from Crypto.Signature import pkcs1_15
-from Crypto.Hash import SHA256
-from Crypto.PublicKey import RSA
 from password_strength import PasswordPolicy
 from password_strength import PasswordStats
 from password_strength.tests import Length, Uppercase, Numbers, Special, NonLetters

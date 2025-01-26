@@ -11,11 +11,15 @@
     {% endif %}
     <div class="login-form">
         <form action="." method="post">
-            {{ form.as_p }}
             {% csrf_token %}
+            {{ form.username.label_tag }} {{ form.username }}
+            {{ form.password.label_tag }} {{ form.password }}
+
+            <div style="display: none;">
+                {{ form.honeypot }}
+            </div>
             <p><input type="submit" value="Login"></p>
         </form>
-        <p><a href="{% url 'password_reset' %}">Forgot your password?</a></p>
         <p>No account? <a href="{% url 'register' %}">Sign Up</a></p>
     </div>
 {% endblock %}

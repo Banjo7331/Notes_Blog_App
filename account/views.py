@@ -1,11 +1,8 @@
 from django.shortcuts import render, redirect
 from django.http import HttpResponse
 from django.contrib.auth import authenticate, login, get_user_model
-from django.contrib.auth.decorators import login_required
-from django.urls import reverse
 from account.models import NoteSiteUser
 from .forms import LoginForm, UserRegistrationForm
-from django.contrib.auth.views import LoginView
 from axes.handlers.proxy import AxesProxyHandler
 from django.contrib import messages
 import pyotp
@@ -25,13 +22,14 @@ def user_login(request):
     storage.used = True
     
     if AxesProxyHandler.is_locked(request):
-        messages.error(request, 'Account locked: too many login attempts. Please try again later.')
+        messages.error(request, 'Too many login attempts. Please try again later.')
 
     if request.method == 'POST':
         form = LoginForm(request.POST)
+
         if form.is_valid():
             cd = form.cleaned_data
-            time.sleep(2)
+            time.sleep(5)
             user = authenticate(request, username=cd['username'], password=cd['password'])
             if user is not None:
                 if user.is_active:
@@ -41,7 +39,7 @@ def user_login(request):
                 else:
                     return HttpResponse('Disabled account')
             else:
-                messages.error(request, 'Invalid username or password.')
+                messages.error(request, "Invalid login attempt.")
                 return redirect('login')  
     else:
         form = LoginForm()
@@ -139,14 +137,10 @@ def verify_otp(request):
             otp_code = form.cleaned_data["otp_code"]
             otp_secret = user.otp_secret
             decrypted_otp_secret = decrypt_otp_secret(otp_secret)
-            print(f"OTP Secret: {decrypted_otp_secret}")
-            
             totp = pyotp.TOTP(decrypted_otp_secret)
 
-            expected_otp = totp.now()
-            print(f"Expected OTP: {expected_otp}, Provided OTP: {otp_code}")
-
             if totp.verify(otp_code,valid_window=1):
+                time.sleep(5)
                 if not user.is_2fa_enabled:
                     user.is_2fa_enabled = True
                     user.save()

@@ -1,14 +1,9 @@
-import base64
-import os
-from collections import namedtuple
 from django.contrib import messages
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
-from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-from django.core.exceptions import ValidationError
+from django.core.paginator import Paginator
 from django.http import JsonResponse
-from django.contrib.auth.password_validation import validate_password
 from account.models import Follow
 from .models import Note
 from .forms import MarkdownNoteForm
@@ -17,7 +12,7 @@ from .utils import sanitize_markdown, encrypt, decrypt
 from notes_keeping_site.utils import decrypt_otp_secret, sign_note, verify_signature, evaluate_password_strength
 from django.db.models import Count
 import pyotp
-from uuid import UUID
+import re
 
 
 NoteSiteUser = get_user_model()
@@ -74,14 +69,22 @@ def profile_view(request, username):
                 note_password = form.cleaned_data['password']
 
                 sanitized_html = sanitize_markdown(raw_content)
-                print("POST data:", request.POST)
+
                 if is_private:
+                    if not note_password:
+                        messages.error(request, "Password cant be empty if you want make a private note")
+                        return redirect('profile', username=username)
+
                     password_strength, password_message = evaluate_password_strength(note_password)
 
                     if password_strength == "very_weak":
                         messages.error(request, f"Password is too weak")
                         return redirect('profile', username=username)
                     
+                    if not re.match(r'^[a-zA-Z0-9, ]+$', recipient_usernames):
+                        messages.error(request, f"One or more recipients not found")
+                        return redirect('profile', username=username)
+
                     usernames = [username.strip() for username in recipient_usernames.split(",")]
 
                     recipients = list(NoteSiteUser.objects.filter(username__in=usernames))
@@ -112,12 +115,6 @@ def profile_view(request, username):
                 if is_private and recipients:
                     new_note.recipients.set(recipients)
 
-                # if is_private and aes_key:
-                #     return JsonResponse({
-                #         "message": "Note created successfully",
-                #         "aes_key": base64.b64encode(aes_key).decode()
-                #     })
-
                 return redirect('profile', username=username)
         else:
             form = MarkdownNoteForm() 
@@ -134,7 +131,6 @@ def profile_view(request, username):
                 otp_secret = user.otp_secret
                 
                 decrypted_otp_secret = decrypt_otp_secret(otp_secret)
-                print(f"OTP Secret: {decrypted_otp_secret}")
                 
                 totp = pyotp.TOTP(decrypted_otp_secret)
                 
@@ -163,39 +159,9 @@ def profile_view(request, username):
         'form': form,
     })
 
-# @login_required
-# def sent_notes_box(request):
-#     user = request.user
-#     sent_notes = Note.objects.filter(is_private=True,recipient=user).order_by('-created_at')
-#     verified_notes = [note for note in sent_notes if verify_signature(note.author, note.serialized_content, note.signature)]
-#     print(len(verified_notes))
-
-#     DecryptedNote = namedtuple('DecryptedNote', ['author', 'title', 'created_at', 'content'])
-
-#     decrypted_notes = []
-#     for note in verified_notes:
-#         try:
-#             decrypted_content = decrypt(note.serialized_content, private_key) if private_key else "🔒 No private key found"
-#         except Exception as e:
-#             decrypted_content = f"❌ Decryption error: {str(e)}"
-        
-#         temp_note = DecryptedNote(
-#             title=note.title, 
-#             created_at=note.created_at, 
-#             author=note.author.username if note.author else "Unknown Sender",
-#             content=decrypted_content
-#         )
-#         decrypted_notes.append(temp_note)
-
-#     page_number = request.GET.get('page', 1)
-#     paginator = Paginator(decrypted_notes, 7)  
-#     page_obj = paginator.get_page(page_number)
-
-#     return render(request, 'notes/sent_notes_box.html', {'page_obj': page_obj})
 
 @login_required
 def sent_notes_box(request):
-    """Wyświetla wszystkie notatki, gdzie użytkownik jest odbiorcą."""
     user = request.user
     received_notes = Note.objects.filter(is_private=True, recipients=user).order_by('-created_at')
 
@@ -207,21 +173,20 @@ def sent_notes_box(request):
 
 @login_required
 def decrypt_note(request, note_id):
-    """Odszyfrowuje notatkę po podaniu hasła i zwraca jej treść w JSON."""
     if request.method == "POST":
         password = request.POST.get("password")
         if not password:
-            return JsonResponse({"error": "Musisz podać hasło."}, status=400)
+            return JsonResponse({"error": "You need to write password."}, status=400)
 
         note = Note.objects.filter(id=note_id, recipients=request.user, is_private=True).first()
         if not note:
-            return JsonResponse({"error": "Notatka nie istnieje lub nie masz do niej dostępu."}, status=404)
+            return JsonResponse({"error": "Note is not existig or you have no obligations to it."}, status=404)
 
         try:
             decrypted_content = decrypt(note.serialized_content, password)
             return JsonResponse({"content": decrypted_content})
         except Exception as e:
-            return JsonResponse({"error": f"❌ Błąd odszyfrowania: {str(e)}"}, status=400)
+            return JsonResponse({"error": f"❌ Encryption error: {str(e)}"}, status=400)
 
     return JsonResponse({"error": "Nieprawidłowa metoda żądania."}, status=405)
 

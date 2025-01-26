@@ -1,9 +1,6 @@
-from django.contrib import admin
-from .models import Follow, NoteSiteUser, LoginIP
+# from django.contrib import admin
+# from .models import Follow, NoteSiteUser
 
-# Register your models here.
-
-admin.site.register(NoteSiteUser)
-admin.site.register(Follow)
-admin.site.register(LoginIP)
+# admin.site.register(NoteSiteUser)
+# admin.site.register(Follow)
 

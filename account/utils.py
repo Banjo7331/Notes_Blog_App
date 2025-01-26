@@ -1,8 +1,6 @@
 import base64
 import io
-import os
 import pyotp
-from datetime import datetime, timedelta
 from django.core.mail import EmailMessage
 from django.template.loader import render_to_string
 from django.contrib.sites.shortcuts import get_current_site
@@ -10,7 +8,6 @@ from django.utils.http import urlsafe_base64_encode
 from django.utils.encoding import force_bytes
 from account.tokens import account_activation_token
 from  notes_keeping_site.utils import get_encryption_key
-from cryptography.fernet import Fernet
 import qrcode
 
 def email_verification(request, user, to_email):
@@ -43,17 +40,11 @@ def generate_qr_code(user_data):
 
 
 def encrypt_otp_secret(otp_secret: str) -> bytes:
-    """
-    Szyfruje tajny klucz OTP jako dane binarne.
-    """
     cipher = get_encryption_key()
     encrypted = cipher.encrypt(otp_secret.encode())  
     return encrypted
 
 def decrypt_otp_secret(encrypted_secret: bytes) -> str:
-    """
-    Odszyfrowuje tajny klucz OTP przechowywany jako dane binarne.
-    """
     cipher = get_encryption_key()
     decrypted = cipher.decrypt(encrypted_secret).decode()  
     return decrypted
